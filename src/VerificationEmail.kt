@@ -1,2 +1,2 @@
-class VerificationEmail(val code: VerificationCode) {
+class VerificationEmail(val code: VerificationCode, val email: Email) {
 }

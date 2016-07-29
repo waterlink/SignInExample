@@ -9,7 +9,8 @@ class SignUpExperience {
     private val validPassword = Password("welcome")
     private var userVerificationService = UserVerificationServiceFake(StockUserVerificationStatusFactory())
     private lateinit var userVerificationOutcome: UserVerificationOutcome
-    private val signUpService = SignUpService(emailService)
+    private val verificationCodeGenerator = StockVerificationCodeGenerator()
+    private val signUpService = SignUpService(emailService, verificationCodeGenerator)
     private val signInService: SignInService = SignInService(userVerificationService)
     private lateinit var signUpOutcome: SignUpOutcome
     private lateinit var signInOutcome: SignInOutcome
@@ -68,26 +69,5 @@ class SignUpExperience {
 
     private fun thenUserIsInformedAboutSuccessfulVerification() {
         assertThat(userVerificationOutcome is SuccessUserVerificationOutcome, equalTo(true))
-    }
-}
-
-class UserVerificationServiceFake(private val userVerificationStatusFactory: UserVerificationStatusFactory) : UserVerificationService {
-    private var verified = false
-
-    override fun verify(code: VerificationCode): UserVerificationOutcome {
-        verified = true
-        return SuccessUserVerificationOutcome()
-    }
-
-    override fun verificationStatusOf(signInModel: SignInModel): UserVerificationStatus {
-        return userVerificationStatusFactory.create(verified)
-    }
-}
-
-class EmailServiceFake: EmailService {
-    var lastEmailReceived: VerificationEmail? = null
-
-    override fun send(verificationEmail: VerificationEmail) {
-        lastEmailReceived = verificationEmail
     }
 }

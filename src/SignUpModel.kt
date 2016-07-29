@@ -1,3 +1,3 @@
-class SignUpModel(email: Email, password: Password) {
+class SignUpModel(val email: Email, password: Password) {
 
 }
