@@ -4,11 +4,14 @@ import org.hamcrest.CoreMatchers.*
 
 class SignUpExperience {
     private lateinit var signUpModel: SignUpModel
-    private val emailService = EmailService()
+    private val emailService = EmailServiceFake()
     private val validUserEmail = Email("john@example.org")
     private val validPassword = Password("welcome")
-    private var userVerificationService = UserVerificationService()
+    private var userVerificationService = UserVerificationServiceFake(StockUserVerificationStatusFactory())
+    private lateinit var userVerificationOutcome: UserVerificationOutcome
+    private val signUpService = SignUpService(emailService)
     private val signInService: SignInService = SignInService(userVerificationService)
+    private lateinit var signUpOutcome: SignUpOutcome
     private lateinit var signInOutcome: SignInOutcome
 
     @Test
@@ -16,13 +19,15 @@ class SignUpExperience {
         givenUserHasProvidedValidEmailAndPassword()
 
         whenUserInitiatesSignUpProcess()
-        thenUserReceivesConfirmationEmail()
-        // thenUserIsInformedAboutTheConfirmationRequirement()
+        thenUserReceivesVerificationEmail()
+        thenUserIsInformedAboutTheVerificationRequirement()
 
         whenUserSignsIn()
         thenSignInResultsInUnverifiedUserFailure()
 
         whenUserInitiatesSignUpVerificationWithCodeFromEmail()
+        thenUserIsInformedAboutSuccessfulVerification()
+
         whenUserSignsIn()
         thenSignInIsSuccessful()
     }
@@ -32,10 +37,10 @@ class SignUpExperience {
     }
 
     private fun whenUserInitiatesSignUpProcess() {
-        SignUpService(emailService).signUp(signUpModel)
+        signUpOutcome = signUpService.signUp(signUpModel)
     }
 
-    private fun thenUserReceivesConfirmationEmail() {
+    private fun thenUserReceivesVerificationEmail() {
         assertThat(emailService.lastEmailReceived, notNullValue())
     }
 
@@ -48,103 +53,41 @@ class SignUpExperience {
     }
 
     private fun whenUserInitiatesSignUpVerificationWithCodeFromEmail() {
-        val confirmationEmail = emailService.lastEmailReceived
-        val code = confirmationEmail!!.code
-        userVerificationService.verify(code)
+        val verificationEmail = emailService.lastEmailReceived
+        val code = verificationEmail!!.code
+        userVerificationOutcome = userVerificationService.verify(code)
     }
 
     private fun thenSignInIsSuccessful() {
         assertThat(signInOutcome is SuccessSignInOutcome, equalTo(true))
     }
+
+    private fun thenUserIsInformedAboutTheVerificationRequirement() {
+        assertThat(signUpOutcome is UserVerificationIsRequired, equalTo(true))
+    }
+
+    private fun thenUserIsInformedAboutSuccessfulVerification() {
+        assertThat(userVerificationOutcome is SuccessUserVerificationOutcome, equalTo(true))
+    }
 }
 
-class UserVerificationService {
+class UserVerificationServiceFake(private val userVerificationStatusFactory: UserVerificationStatusFactory) : UserVerificationService {
     private var verified = false
 
-    fun verify(code: ConfirmationCode) {
+    override fun verify(code: VerificationCode): UserVerificationOutcome {
         verified = true
+        return SuccessUserVerificationOutcome()
     }
 
-    fun userIsVerified(signInModel: SignInModel): Boolean {
-        return verified
-    }
-
-    fun verificationStatusOf(signInModel: SignInModel): UserVerificationStatus {
-        if (verified) return UserIsVerified()
-        return UserIsNotVerified()
-    }
-
-}
-
-class UserIsVerified : UserVerificationStatus {
-    override fun getSignInOutcome(): SignInOutcome {
-        return SuccessSignInOutcome()
-    }
-
-}
-
-class UserIsNotVerified : UserVerificationStatus {
-    override fun getSignInOutcome(): SignInOutcome {
-        return UnverifiedUserFailureSignInOutcome()
+    override fun verificationStatusOf(signInModel: SignInModel): UserVerificationStatus {
+        return userVerificationStatusFactory.create(verified)
     }
 }
 
-interface UserVerificationStatus {
-    fun getSignInOutcome(): SignInOutcome
-}
+class EmailServiceFake: EmailService {
+    var lastEmailReceived: VerificationEmail? = null
 
-interface SignInOutcome {
-
-}
-
-class SignInModel(email: Email, password: Password) {
-}
-
-class SignInService(private val userVerificationService: UserVerificationService) {
-
-    fun signIn(signInModel: SignInModel): SignInOutcome {
-        return userVerificationService.verificationStatusOf(signInModel).getSignInOutcome()
+    override fun send(verificationEmail: VerificationEmail) {
+        lastEmailReceived = verificationEmail
     }
-}
-
-class UnverifiedUserFailureSignInOutcome : SignInOutcome {
-
-}
-
-class SuccessSignInOutcome : SignInOutcome {
-
-}
-
-class EmailService {
-    var lastEmailReceived: ConfirmationEmail? = null
-
-    fun send(confirmationEmail: ConfirmationEmail) {
-        lastEmailReceived = confirmationEmail
-    }
-}
-
-class ConfirmationEmail(val code: ConfirmationCode) {
-}
-
-class SignUpService(private val emailService: EmailService) {
-    fun signUp(signUpModel: SignUpModel) {
-        val code = ConfirmationCode("THE CODE")
-        emailService.send(ConfirmationEmail(code))
-    }
-}
-
-class ConfirmationCode(code: String) {
-
-}
-
-class SignUpModel(email: Email, password: Password) {
-
-}
-
-class Password(password: String) {
-
-}
-
-class Email(email: String) {
-
 }

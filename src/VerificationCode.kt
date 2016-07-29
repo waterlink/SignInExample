@@ -1,0 +1,3 @@
+class VerificationCode(code: String) {
+
+}
